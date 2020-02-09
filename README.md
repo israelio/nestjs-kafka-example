@@ -1,6 +1,6 @@
 ## Description
 
-I was looking for an example to demonstrate to some team members how you can use nestjs with kafka but i haven't been able to find an example and nest documentation regarding the microservices module and kafka are not so great... so i've compiled the following example and you are free to download and test it.
+I was looking for an example to demonstrate to some team members how you can use <b>nestjs</b> with <b>kafka</b> but i haven't been able to find an example and nest documentation regarding the <b>microservices</b> module and kafka are not so great... so i've compiled the following example and you are free to download and test it.
 
 If you need also to setup kafka on your machine i've created also a docker compose file including some commands to handle the topics, publish messages and more.
 
