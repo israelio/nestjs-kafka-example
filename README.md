@@ -1,76 +1,115 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo_text.svg" width="320" alt="Nest Logo" /></a>
-</p>
-
-[travis-image]: https://api.travis-ci.org/nestjs/nest.svg?branch=master
-[travis-url]: https://travis-ci.org/nestjs/nest
-[linux-image]: https://img.shields.io/travis/nestjs/nest/master.svg?label=linux
-[linux-url]: https://travis-ci.org/nestjs/nest
-  
-  <p align="center">A progressive <a href="http://nodejs.org" target="blank">Node.js</a> framework for building efficient and scalable server-side applications, heavily inspired by <a href="https://angular.io" target="blank">Angular</a>.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore"><img src="https://img.shields.io/npm/dm/@nestjs/core.svg" alt="NPM Downloads" /></a>
-<a href="https://travis-ci.org/nestjs/nest"><img src="https://api.travis-ci.org/nestjs/nest.svg?branch=master" alt="Travis" /></a>
-<a href="https://travis-ci.org/nestjs/nest"><img src="https://img.shields.io/travis/nestjs/nest/master.svg?label=linux" alt="Linux" /></a>
-<a href="https://coveralls.io/github/nestjs/nest?branch=master"><img src="https://coveralls.io/repos/github/nestjs/nest/badge.svg?branch=master#5" alt="Coverage" /></a>
-<a href="https://gitter.im/nestjs/nestjs?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=body_badge"><img src="https://badges.gitter.im/nestjs/nestjs.svg" alt="Gitter" /></a>
-<a href="https://opencollective.com/nest#backer"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec"><img src="https://img.shields.io/badge/Donate-PayPal-dc3d53.svg"/></a>
-  <a href="https://twitter.com/nestframework"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
-
 ## Description
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+I was looking for an example to demonstrate to some team members how you can use nestjs with kafka but i haven't been able to find an example and nest documentation regarding the microservices module and kafka are not so great... so i've compiled the following example and you are free to download and test it.
 
-## Installation
+If you need also to setup kafka on your machine i've created also a docker compose file including some commands to handle the topics, publish messages and more.
 
-```bash
-$ npm install
+It is available over here : [kafka-docker-sample](https://github.com/israelio/kafka-docker-sample)
+
+## I wana see it working first
+* Download the [docker sample](https://github.com/israelio/kafka-docker-sample) and run the start command
+```
+$ git clone git@github.com:israelio/kafka-docker-sample.git
+
+$ chmod +x make-commands-executable.sh
+
+$ ./start
+```
+* Create a kafka topic
+```
+$ ./kafka/topic/create entity-created
+```
+* Publish a message to this topic
+```
+# each line is a new message, click ctrl-c to end.
+
+$ ./kafka/message/produce entity-created
 ```
 
-## Running the app
+* Clone this repo
+```
+$ git clone git@github.com:israelio/nestjs-kafka-example.git
+```
+* Install the project dependencies i.e. run npm install
+```
+$ npm i
+```
+* Run the project
+```
+$ npm start
+```
+* once you will run the project you should see the message that you published appears at the console
 
-```bash
-# development
-$ npm run start
+## I want to understand what to do in my project
 
-# watch mode
-$ npm run start:dev
+* Prepare a confiuration class with the kafka configuration
+```javascript
+// microserviceConfig.ts
+export const microserviceConfig: KafkaOptions = {
+    transport: Transport.KAFKA,
 
-# production mode
-$ npm run start:prod
+    options: {
+        client: {
+            brokers: ["127.0.0.1:9092"],
+        },
+        consumer: {
+            groupId: '1',
+            allowAutoTopicCreation: true,
+        },
+    }
+};
 ```
 
-## Test
+* Init the nest js microservices module in the bootstrap
+```javascript
+// main.ts
+async function bootstrap() {
+  const app = await NestFactory.create(AppModule);
+  app.connectMicroservice(microserviceConfig);
 
-```bash
-# unit tests
-$ npm run test
-
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
+  await app.startAllMicroservicesAsync();
+  await app.listen(3000);
+}
 ```
 
-## Support
+* Declare the ClientKafka which will allow you also to send messages
+* Iherit from OnModuleInit and implement the onModuleInit where you will subscribe the controller to the target topic and to the message handler
+* Declare a message handler for the payload and decorate it with the EventPattern which includes the topic name
+```javascript
+@Controller()
+export class AppController implements OnModuleInit {
+  constructor(private readonly appService: AppService) {}
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+  @Client(microserviceConfig)
+  client: ClientKafka;
 
-## Stay in touch
 
-- Author - [Kamil Myśliwiec](https://kamilmysliwiec.com)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+  onModuleInit() {
+    const requestPatterns = [
+      'entity-created',
+    ];
 
-## License
+    requestPatterns.forEach(pattern => {
+      this.client.subscribeToResponseOf(pattern);
+    });
+  }
 
-  Nest is [MIT licensed](LICENSE).
-# nestjs-kafka-example
+  @Get()
+  getHello(): string {
+    return this.appService.getHello();
+  }
+
+  @EventPattern('entity-created')
+  async handleEntityCreated(payload: any) {
+    console.log(JSON.stringify(payload) + ' created');
+  }
+}
+```
+* If you want to fire events to kafka from your controller use the client emit function
+```javascript
+  // fire event to kafka
+  this.client.emit<string>('entity-created', 'some entity ' + new Date());
+
+```
+
+## nestjs-kafka-example
